@@ -1,0 +1,9 @@
+[package]
+name = "shai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dotenv = "0.15.0"
+inquire = "0.7.5"
+openai-api-rs = "5.2.3"
