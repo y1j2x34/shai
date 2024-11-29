@@ -1,13 +1,13 @@
-use std::{env, io};
+use std::{clone, env, io};
 use std::fmt::Display;
 use std::process::{Command, ExitStatus};
 extern crate os_type;
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use inquire::Select;
+use inquire::Text;
 use openai_api_rs::v1::api::OpenAIClient;
-use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, Content, ChatCompletionMessage};
+use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, Content};
 use openai_api_rs::v1::common::GPT3_5_TURBO;
 
 
@@ -78,13 +78,13 @@ async fn get_command_suggestion(
     
     let system_message = format!(r#"
     You are an expert at using shell commands.
-    I need you to provide a response in the format: ```{{\"command\": \"your_shell_command_here\"}}```. 
+    I need you to provide a response in the format: ```command: your_shell_command_here```. 
     {} 
     Only provide a single executable ling of shell code as the value for the \"command\" key. Never output any text and code block outside the JSON structure.
     The command wil be directly executed in a shell.
     For example: 
-    if the user asks to install Rust, respond with: ```{{\"command\": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"}}```;
-    if the user asks to delete a directory, respond with: ```{{\"command\": "rm -rf /path/to/directory # add additional commands here if danger!"}}```.`
+    if the user asks to install Rust, respond with: ```command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh```;
+    if the user asks to delete a directory, respond with: ```command: rm -rf /path/to/directory # add additional commands here if danger!```.
     "#, platform_info);
     
     let user_message = format!("Here's what I'm trying to do: {}", user_input.to_string());
@@ -153,21 +153,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             let result = get_command_suggestion(&client, model.as_str(), user_input).await?;
             
-            let json = result.trim().trim_matches(&['`', '\n', '\r']);
+            let result = result.trim().trim_matches(&['`', '\n', '\r']).to_string();
             
-            let suggestion_result = serde_json::from_str::<Suggestion>(&json);
+            let command = result.replace("command: ", "").trim_start().to_string();
             
-            match suggestion_result {
-                Ok(suggestion) => {
-                    println!("suggestion: {}", suggestion);
-                    suggestions.push(suggestion);
-                    break;
-                }
-                Err(e) => {
-                    retry_count = retry_count - 1;
-                    println!("invalid response: {}, json: {}, error: {}", result, json, e);
-                }
+            if command.is_empty() {
+                println!("Invalid command: {}", command);
+                retry_count = retry_count - 1
+            } else {
+                retry_count = 0
             }
+            
+            let suggestion = Suggestion { command };
+            
+            suggestions.push(suggestion);
         }
     }
     
@@ -177,9 +176,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ).prompt()?;
 
     println!("Executing: {}", selection);
-
     
-    match selection.execute() {
+    let command = Text::new("")
+        .with_help_message("Type to modify the suggested command, or press Enter to execute the command")
+        .with_initial_value(&selection.command)
+        .prompt()?;
+    
+    let suggestion = Suggestion { command };
+    
+    match suggestion.execute() {
         Ok(status) => {
             if status.success() {
                 println!("Command executed successfully");
