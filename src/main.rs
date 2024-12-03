@@ -1,6 +1,5 @@
-use std::{env, io};
+use std::env;
 use std::fmt::Display;
-use std::process::{Command, ExitStatus};
 extern crate os_type;
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
@@ -8,54 +7,22 @@ use inquire::Select;
 use inquire::Text;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, Content};
+use cmd_lib::run_cmd;
 
 
-// async fn ask_ai_question(
-//     client: &OpenAIClient,
-//     model: &str,
-//     system_message: &str,
-//     user_input: &str
-// ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-//     let messages = vec![
-//         ChatCompletionMessage {
-//             role: MessageRole::system,
-//             content: Content::Text(String::from(system_message)),
-//             name: None,
-//             tool_calls: None,
-//             tool_call_id: None,
-//         },
-//         ChatCompletionMessage {
-//             role: MessageRole::user,
-//             content: Content::Text(user_input.to_string()),
-//             name: None,
-//             tool_calls: None,
-//             tool_call_id: None,
-//         },
-//     ];
-//     let req = ChatCompletionRequest::new(model.to_string(), messages);
-//     let result = client.chat_completion(req).await?;
-//     let content = result.choices[0].message.content.clone();
-//     Ok(content)
-// }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 struct Suggestion {
     pub command: String,
 }
 impl Suggestion {
-    fn execute(&self) -> io::Result<ExitStatus> {
-        let parts: Vec<&str> = self.command.split_whitespace().collect();
-        if parts.is_empty() {
-            println!("Invalid command");
-            return Ok(ExitStatus::default());
+    fn execute(&self) -> () {
+        let command = self.command.as_str();
+        if cfg!(windows) {
+            run_cmd!(cmd.exe /C "$command").unwrap();
+        } else {
+            run_cmd!(bash -c "$command").unwrap();
         }
-    
-        let program = parts[0];
-        let args = &parts[1..];
-    
-        Command::new(program)
-        .args(args)
-        .status()
     }
 }
 
@@ -183,17 +150,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let suggestion = Suggestion { command };
     
-    match suggestion.execute() {
-        Ok(status) => {
-            if status.success() {
-                println!("Command executed successfully");
-            } else {
-                println!("Command failed with status: {}", status);
-            }
-        }
-        Err(e) => {
-            println!("Comand execution failed: {:?}", e);
-        },
-    }
+    suggestion.execute();
     Ok(())
 }

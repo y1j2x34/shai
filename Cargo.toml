@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cmd_lib = "1.9.5"
 dotenv = "0.15.0"
 inquire = "0.7.5"
 openai-api-rs = "5.2.3"
