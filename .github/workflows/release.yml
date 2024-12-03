@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build-release:
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: shai
+            asset_name: shai-linux-amd64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: shai
+            asset_name: shai-macos-amd64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: shai.exe
+            asset_name: shai-windows-amd64.exe
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+      
+      - name: Prepare asset
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+          else
+            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+            chmod +x ${{ matrix.asset_name }}
+          fi
+
+      - name: Generate install script
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          cat > install.sh << 'EOF'
+          #!/bin/bash
+          set -e
+
+          # Detect OS
+          OS="$(uname -s)"
+          ARCH="$(uname -m)"
+
+          if [ "$OS" = "Darwin" ]; then
+            BINARY_URL="https://github.com/y1j2x34/shai/releases/latest/download/shai-macos-amd64"
+          elif [ "$OS" = "Linux" ]; then
+            BINARY_URL="https://github.com/y1j2x34/shai/releases/latest/download/shai-linux-amd64"
+          else
+            echo "Unsupported operating system: $OS"
+            exit 1
+          fi
+
+          # Create installation directory
+          INSTALL_DIR="/usr/local/bin"
+          sudo mkdir -p "$INSTALL_DIR"
+
+          echo "Downloading shai..."
+          sudo curl -L "$BINARY_URL" -o "$INSTALL_DIR/shai"
+          sudo chmod +x "$INSTALL_DIR/shai"
+
+          echo "shai has been installed to $INSTALL_DIR/shai"
+          echo "You can now use 'shai' command."
+          EOF
+          chmod +x install.sh
+
+      - name: Upload binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload install script
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./install.sh
+          asset_name: install.sh
+          asset_content_type: text/x-shellscript

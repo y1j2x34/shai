@@ -1,4 +1,4 @@
-use std::{clone, env, io};
+use std::{env, io};
 use std::fmt::Display;
 use std::process::{Command, ExitStatus};
 extern crate os_type;
@@ -8,7 +8,6 @@ use inquire::Select;
 use inquire::Text;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, Content};
-use openai_api_rs::v1::common::GPT3_5_TURBO;
 
 
 // async fn ask_ai_question(
@@ -118,10 +117,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     
     // Get OpenAI API key from environment
-    let api_key = env::var("SHAI_OPENAI_API_KEY")
-        .expect("SHAI_OPENAI_API_KEY must be set");
-    let endpoint = env::var("SHAI_OPENAI_API_ENDPOINT").unwrap_or("https://api.openai.com/v1".to_string());
-    let model = env::var("SHAI_OPENAI_MODEL").unwrap_or(GPT3_5_TURBO.to_string());
+    let api_key = env::var("SHAI_API_KEY")
+        .expect("SHAI_API_KEY must be set");
+    let endpoint = env::var("SHAI_API_ENDPOINT").unwrap_or("https://openrouter.ai/api/v1".to_string());
+    let model = env::var("SHAI_MODEL").unwrap_or("meta-llama/llama-3.1-70b-instruct:free".to_string());
     let suggestion_count: i32 = env::var("SHAI_SUGGESTION_COUNT")
         .unwrap_or("2".to_string())
         .parse()
