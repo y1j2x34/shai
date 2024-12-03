@@ -110,8 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let user_input = &args[1];
     
-    println!("user input: {} ", user_input);
-    
     let mut suggestions: Vec<Suggestion> = Vec::new();
     for _ in 0..suggestion_count {
         let mut retry_count = 3;
@@ -140,8 +138,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &format!("Suggested commands for: {}", user_input),
         suggestions,
     ).prompt()?;
-
-    println!("Executing: {}", selection);
     
     let command = Text::new("")
         .with_help_message("Type to modify the suggested command, or press Enter to execute the command")
