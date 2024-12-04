@@ -3,126 +3,202 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+    - '*'
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  create-release:
-    permissions:
-      contents: write
+  prerelease:
     runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
 
-  build-release:
-    permissions:
-      contents: write
-    needs: create-release
-    runs-on: ${{ matrix.os }}
+    outputs:
+      value: ${{ steps.prerelease.outputs.value }}
+
+    steps:
+    - name: Prerelease Check
+      id: prerelease
+      run: |
+        if [[ ${{ github.ref_name }} =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo value=false >> $GITHUB_OUTPUT
+        else
+            echo value=true >> $GITHUB_OUTPUT
+        fi
+
+  package:
     strategy:
       matrix:
+        target:
+        - aarch64-apple-darwin
+        - aarch64-unknown-linux-musl
+        - arm-unknown-linux-musleabihf
+        - armv7-unknown-linux-musleabihf
+        - x86_64-apple-darwin
+        - x86_64-pc-windows-msvc
+        - aarch64-pc-windows-msvc
+        - x86_64-unknown-linux-musl
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: shai
-            asset_name: shai-linux-amd64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: shai
-            asset_name: shai-macos-amd64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: shai.exe
-            asset_name: shai-windows-amd64.exe
+        - target: aarch64-apple-darwin
+          os: macos-latest
+          target_rustflags: ''
+        - target: aarch64-unknown-linux-musl
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=aarch64-linux-gnu-gcc'
+        - target: arm-unknown-linux-musleabihf
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+        - target: armv7-unknown-linux-musleabihf
+          os: ubuntu-latest
+          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+        - target: x86_64-apple-darwin
+          os: macos-latest
+          target_rustflags: ''
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+        - target: aarch64-pc-windows-msvc
+          os: windows-latest
+          target_rustflags: ''
+        - target: x86_64-unknown-linux-musl
+          os: ubuntu-latest
+          target_rustflags: ''
+
+    runs-on: ${{matrix.os}}
+
+    needs:
+    - prerelease
 
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
-      
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }}
-      
-      - name: Prepare asset
-        shell: bash
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
-          else
-            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
-            chmod +x ${{ matrix.asset_name }}
-          fi
+    - uses: actions/checkout@v4
+    - name: Install musl-gcc
+      if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+    - name: Install AArch64 Toolchain
+      if: ${{ matrix.target == 'aarch64-unknown-linux-musl' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install gcc-aarch64-linux-gnu libc6-dev-i386
 
-      - name: Generate install script
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          cat > install.sh << 'EOF'
-          #!/bin/bash
-          set -e
+    - name: Install ARM Toolchain and OpenSSL
+      if: ${{ matrix.target == 'arm-unknown-linux-musleabihf' || matrix.target == 'armv7-unknown-linux-musleabihf' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools libssl-dev
+        # Install cross-compiler for ARM
+        sudo apt-get install -y gcc-arm-linux-gnueabihf
+        # Install dependencies for OpenSSL compilation
+        sudo apt-get install -y make perl
 
-          # Detect OS
-          OS="$(uname -s)"
-          ARCH="$(uname -m)"
+        # Download and build musl-cross-make
+        git clone https://github.com/richfelker/musl-cross-make.git
+        cd musl-cross-make
+        echo "TARGET = armv7l-linux-musleabihf" > config.mak
+        echo "OUTPUT = /usr/local/musl" >> config.mak
+        make -j$(nproc)
+        sudo make install
+        cd ..
 
-          if [ "$OS" = "Darwin" ]; then
-            BINARY_URL="https://github.com/y1j2x34/shai/releases/latest/download/shai-macos-amd64"
-          elif [ "$OS" = "Linux" ]; then
-            BINARY_URL="https://github.com/y1j2x34/shai/releases/latest/download/shai-linux-amd64"
-          else
-            echo "Unsupported operating system: $OS"
-            exit 1
-          fi
+        # Download and cross-compile OpenSSL
+        wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+        tar xf openssl-1.1.1w.tar.gz
+        cd openssl-1.1.1w
+        
+        # Configure OpenSSL for ARM with musl
+        export CC=/usr/local/musl/bin/armv7l-linux-musleabihf-gcc
+        export AR=/usr/local/musl/bin/armv7l-linux-musleabihf-ar
+        export RANLIB=/usr/local/musl/bin/armv7l-linux-musleabihf-ranlib
+        
+        ./Configure linux-generic32 no-shared \
+          --prefix=/usr/local/musl/armv7l-linux-musleabihf \
+          --openssldir=/usr/local/musl/armv7l-linux-musleabihf/openssl \
+          -static
+        
+        make -j$(nproc)
+        sudo make install_sw
+        cd ..
 
-          # Create installation directory
-          INSTALL_DIR="/usr/local/bin"
-          sudo mkdir -p "$INSTALL_DIR"
+        # Set environment variables for cross-compilation
+        echo "OPENSSL_DIR=/usr/local/musl/armv7l-linux-musleabihf" >> $GITHUB_ENV
+        echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=/usr/local/musl/armv7l-linux-musleabihf/lib/pkgconfig" >> $GITHUB_ENV
+        echo "OPENSSL_INCLUDE_DIR=/usr/local/musl/armv7l-linux-musleabihf/include" >> $GITHUB_ENV
+        echo "OPENSSL_LIB_DIR=/usr/local/musl/armv7l-linux-musleabihf/lib" >> $GITHUB_ENV
 
-          echo "Downloading shai..."
-          sudo curl -L "$BINARY_URL" -o "$INSTALL_DIR/shai"
-          sudo chmod +x "$INSTALL_DIR/shai"
+    - name: Install AArch64 Toolchain (Windows)
+      if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}
+      run: |
+        rustup target add aarch64-pc-windows-msvc
 
-          echo "shai has been installed to $INSTALL_DIR/shai"
-          echo "You can now use 'shai' command."
-          EOF
-          chmod +x install.sh
+    - name: Generate Completion Scripts and Manpage
+      run: |
+        set -euxo pipefail
+        cargo build
 
-      - name: Upload binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/octet-stream
+    - name: Package
+      id: package
+      env:
+        TARGET: ${{ matrix.target }}
+        REF: ${{ github.ref }}
+        OS: ${{ matrix.os }}
+        TARGET_RUSTFLAGS: ${{ matrix.target_rustflags }}
+      run: ./bin/package
+      shell: bash
 
-      - name: Upload install script
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./install.sh
-          asset_name: install.sh
-          asset_content_type: text/x-shellscript
+    - name: Publish Archive
+      uses: softprops/action-gh-release@v2.1.0
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      with:
+        draft: false
+        files: ${{ steps.package.outputs.archive }}
+        prerelease: ${{ needs.prerelease.outputs.value }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # - name: Publish Changelog
+    #   uses: softprops/action-gh-release@v2.1.0
+    #   if: >-
+    #     ${{
+    #       startsWith(github.ref, 'refs/tags/')
+    #       && matrix.target == 'x86_64-unknown-linux-musl'
+    #     }}
+    #   with:
+    #     draft: false
+    #     files: CHANGELOG.md
+    #     prerelease: ${{ needs.prerelease.outputs.value }}
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  checksum:
+    runs-on: ubuntu-latest
+
+    needs:
+    - package
+    - prerelease
+
+    steps:
+    - name: Download Release Archives
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: >-
+        gh release download
+        --repo y1j2x34/shai
+        --pattern '*'
+        --dir release
+        ${{ github.ref_name }}
+
+    - name: Create Checksums
+      run: |
+        cd release
+        shasum -a 256 * > ../SHA256SUMS
+
+    - name: Publish Checksums
+      uses: softprops/action-gh-release@v2.1.0
+      with:
+        draft: false
+        files: SHA256SUMS
+        prerelease: ${{ needs.prerelease.outputs.value }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

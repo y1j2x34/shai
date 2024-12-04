@@ -1,17 +1,14 @@
 use std::env;
 use std::fmt::Display;
-extern crate os_type;
+use os_type;
 use dotenv::dotenv;
-use serde::{Deserialize, Serialize};
 use inquire::Select;
 use inquire::Text;
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest, MessageRole, Content};
 use cmd_lib::run_cmd;
 
-
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct Suggestion {
     pub command: String,
 }
@@ -81,6 +78,12 @@ async fn get_command_suggestion(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get command line arguments
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 || args.contains(&"--help".to_string())  {
+        println!("Usage: shai \"<command description>\"");
+        return Ok(());
+    }
     dotenv().ok();
     
     // Get OpenAI API key from environment
@@ -101,12 +104,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_api_key(api_key)
         .build()?;
 
-    // Get command line arguments
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: shai \"<command description>\"");
-        return Ok(());
-    }
 
     let user_input = &args[1];
     

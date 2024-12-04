@@ -1,14 +1,33 @@
 [package]
 name = "shai"
 version = "0.1.0"
+author = ["Chien-hsin Yang <y1j2x345@gmail.com>"]
 edition = "2021"
+repository = "https://github.com/y1j2x34/shai"
 
 [dependencies]
 cmd_lib = "1.9.5"
 dotenv = "0.15.0"
 inquire = "0.7.5"
-openai-api-rs = "5.2.3"
+openai-api-rs = { version = "5.2.3", default-features = false, features = ["rustls"] }
 os_type = "2.6.0"
-serde = "1.0.215"
-serde_json = "1.0.133"
 tokio = "1.41.1"
+
+[[bin]]
+path = "src/main.rs"
+name = "shai"
+test = false
+
+[profile.release]
+lto = true
+opt-level = 'z'
+codegen-units = 1
+
+# [target.armv7-unknown-linux-gnueabihf]
+# linker = "arm-linux-gnueabihf-gcc"
+# rustflags = ["-C", "target-feature=+crt-static"]
+
+# [workspace.metadata.dist.dependencies.apt]
+# gcc-aarch64-linux-gnu = { version = '*', targets = ["aarch64-unknown-linux-gnu"] }
+# gcc-arm-linux-gnueabihf = { version = '*', targets = ["armv7-unknown-linux-gnueabihf"] }
+# arm-linux-gnueabihf-gcc = { version = '*', targets = ["armv7-unknown-linux-gnueabihf"] }

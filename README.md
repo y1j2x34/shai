@@ -12,28 +12,31 @@ SHAI is a command-line tool that uses AI to suggest and execute shell commands b
 
 ## Installation
 
-### macOS and Linux
+### Pre-Built Binaries
 
-One-line installation:
+Pre-built binaries for Linux, MacOS, and Windows can be found on the releases page.
+
+You can use the following command on Linux, MacOS, or Windows to download the latest release, *shai* replace DEST with the directory where you'd like to put *shai*:
 
 ```bash
-curl -s https://github.com/y1j2x34/shai/releases/latest/download/install.sh | bash
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/y1j2x34/shai/refs/heads/master/install.sh | bash -s -- --to DEST
 ```
 
-### Windows
+```sh
+# create ~/bin
+mkdir -p ~/bin
 
-#### Option 1: Direct Download
+# download and extract shai to ~/bin/shai
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/y1j2x34/shai/refs/heads/master/install.sh | bash -s -- --to ~/bin
 
-1. Download the latest `shai-windows-amd64.exe` from the [releases page](https://github.com/y1j2x34/shai/releases/latest)
-2. Rename it to `shai.exe`
-3. Move it to a directory in your PATH (e.g., `C:\Windows\System32`)
+# add `~/bin` to the paths that your shell searches for executables
+# this line should be added to your shells initialization file,
+# e.g. `~/.bashrc` or `~/.zshrc`
+export PATH="$PATH:$HOME/bin"
 
-#### Option 2: Building from Source
-
-### Prerequisites
-
-- Rust toolchain (if building from source)
-- curl (for Unix-like systems)
+# shai should now be executable
+shai --help
+```
 
 ### Building from Source
 
