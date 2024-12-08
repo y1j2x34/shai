@@ -24,7 +24,15 @@ FLAGS:
 OPTIONS:
     --tag TAG       Tag (version) of the crate to install, defaults to latest release
     --to LOCATION   Where to install the binary [default: ~/bin]
-    --target TARGET
+    --target TARGET Target triple, see list below:
+
+TARGETS:
+    aarch64-apple-darwin        ARM64 macOS
+    aarch64-pc-windows-msvc     ARM64 Windows
+    aarch64-unknown-linux-musl  ARM64 Linux
+    x86_64-apple-darwin        x86_64 macOS
+    x86_64-pc-windows-msvc     x86_64 Windows
+    x86_64-unknown-linux-musl  x86_64 Linux
 EOF
 }
 
@@ -122,30 +130,40 @@ if [ -z "${tag-}" ]; then
 fi
 
 if [ -z "${target-}" ]; then
-  # bash compiled with MINGW (e.g. git-bash, used in github windows runners),
-  # unhelpfully includes a version suffix in `uname -s` output, so handle that.
-  # e.g. MINGW64_NT-10-0.19044
-  kernel=$(uname -s | cut -d- -f1)
-  uname_target="$(uname -m)-$kernel"
+  kernel=$(uname -s)
+  arch=$(uname -m)
 
-  case $uname_target in
-    aarch64-Linux) target=aarch64-unknown-linux-musl;;
-    arm64-Darwin) target=aarch64-apple-darwin;;
-    armv6l-Linux) target=arm-unknown-linux-musleabihf;;
-    armv7l-Linux) target=armv7-unknown-linux-musleabihf;;
-    x86_64-Darwin) target=x86_64-apple-darwin;;
-    x86_64-Linux) target=x86_64-unknown-linux-musl;;
-    x86_64-MINGW64_NT) target=x86_64-pc-windows-msvc;;
-    x86_64-Windows_NT) target=x86_64-pc-windows-msvc;;
+  case "$kernel" in
+    Darwin)
+      case "$arch" in
+        arm64) target="aarch64-apple-darwin";;
+        x86_64) target="x86_64-apple-darwin";;
+      esac
+      ;;
+    Linux)
+      case "$arch" in
+        aarch64) target="aarch64-unknown-linux-musl";;
+        x86_64) target="x86_64-unknown-linux-musl";;
+      esac
+      ;;
+    MINGW* | MSYS* | Windows_NT)
+      case "$arch" in
+        aarch64) target="aarch64-pc-windows-msvc";;
+        x86_64) target="x86_64-pc-windows-msvc";;
+      esac
+      ;;
     *)
-      # shellcheck disable=SC2016
-      err 'Could not determine target from output of `uname -m`-`uname -s`, please use `--target`:' "$uname_target"
-    ;;
+      err "unsupported operating system: $kernel"
+      ;;
   esac
+
+  if [ -z "${target-}" ]; then
+    err "unsupported architecture: $arch"
+  fi
 fi
 
 case $target in
-  x86_64-pc-windows-msvc) extension=zip; need unzip;;
+  *-pc-windows-msvc) extension=zip; need unzip;;
   *) extension=tar.gz; need tar;;
 esac
 
