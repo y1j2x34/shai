@@ -27,7 +27,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/y1j2x34/s
 mkdir -p ~/bin
 
 # download and extract shai to ~/bin/shai
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/y1j2x34/shai/refs/heads/master/install.sh | bash -s -- --to ~/bin
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/y1j2x34/shai/refs/heads/master/install.sh | bash -s -- --tag v0.1.0 --to ~/bin
 
 # add `~/bin` to the paths that your shell searches for executables
 # this line should be added to your shells initialization file,
