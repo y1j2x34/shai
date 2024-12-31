@@ -47,7 +47,7 @@ async fn get_command_suggestion(
     The command wil be directly executed in a shell.
     For example: 
     if the user asks to install Rust, respond with: ```command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh```;
-    if the user asks to delete a directory, respond with: ```command: rm -rf /path/to/directory # add additional commands here if danger!```.
+    if the user asks to delete a directory, respond with: ```command: rm -rf /path/to/directory # add additional comments here if danger!```.
     "#, platform_info);
     
     let user_message = format!("Here's what I'm trying to do: {}", user_input.to_string());
