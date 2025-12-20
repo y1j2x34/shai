@@ -7,8 +7,11 @@ SHAI is a command-line tool that uses AI to suggest and execute shell commands b
 - Natural language to shell command conversion
 - Multiple command suggestions for each query
 - Interactive command selection and modification
+- **Command history tracking** - automatically saves all executed commands
+- **History search** - quickly find previously used commands
 - Support for custom OpenAI API endpoints
 - Cross-platform support (Linux, macOS, and Windows)
+- Modular architecture for easy feature extensions
 
 ## Installation
 
@@ -79,36 +82,66 @@ SHAI_SUGGESTION_COUNT=2
 
 ## Usage
 
+### Generate and Execute Commands
+
 ```bash
 shai "your command description here"
 ```
 
+The tool will:
+1. Generate multiple command suggestions based on your description
+2. Display them in an interactive selection menu
+3. Allow you to modify the selected command before execution
+4. Save the command to history
+5. Execute the chosen command
+
+### View Command History
+
+```bash
+# Show last 20 commands (default)
+shai history
+
+# Show last 10 commands
+shai history --limit 10
+
+# Search history for specific commands
+shai history --search "docker"
+
+# Clear all history
+shai history --clear
+```
+
 ### Examples
 
-1. Find large files:
+1. **Find large files:**
 
     ```bash
     shai "find files larger than 1GB in the current directory"
     ```
 
-2. Process text files:
+2. **Process text files:**
 
     ```bash
     shai "search for the word 'error' in all log files"
     ```
 
-3. System maintenance:
+3. **System maintenance:**
 
     ```bash
     shai "clean up old docker images and containers"
     ```
 
-The tool will:
+4. **Review what you've done:**
 
-1. Generate multiple command suggestions based on your description
-2. Display them in an interactive selection menu
-3. Allow you to modify the selected command before execution
-4. Execute the chosen command
+    ```bash
+    shai history --limit 5
+    ```
+
+5. **Find a previous Docker command:**
+
+    ```bash
+    shai history --search docker
+    ```
 
 ## License
 

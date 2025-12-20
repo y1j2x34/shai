@@ -1,0 +1,35 @@
+use std::env;
+use dotenv::dotenv;
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub api_key: String,
+    pub endpoint: String,
+    pub model: String,
+    pub suggestion_count: i32,
+}
+
+impl Config {
+    pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
+        dotenv().ok();
+        
+        let api_key = env::var("SHAI_API_KEY")
+            .expect("SHAI_API_KEY must be set");
+        let endpoint = env::var("SHAI_API_ENDPOINT")
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
+        let model = env::var("SHAI_MODEL")
+            .unwrap_or_else(|_| "meta-llama/llama-3.1-70b-instruct:free".to_string());
+        let suggestion_count: i32 = env::var("SHAI_SUGGESTION_COUNT")
+            .unwrap_or_else(|_| "2".to_string())
+            .parse()
+            .unwrap_or(2);
+
+        Ok(Self {
+            api_key,
+            endpoint,
+            model,
+            suggestion_count,
+        })
+    }
+}
+
