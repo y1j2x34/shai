@@ -47,10 +47,10 @@ jobs:
           target_rustflags: '--codegen linker=aarch64-linux-gnu-gcc'
         - target: arm-unknown-linux-musleabihf
           os: ubuntu-latest
-          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+          target_rustflags: ''
         - target: armv7-unknown-linux-musleabihf
           os: ubuntu-latest
-          target_rustflags: '--codegen linker=arm-linux-gnueabihf-gcc'
+          target_rustflags: ''
         - target: x86_64-apple-darwin
           os: macos-latest
           target_rustflags: ''
