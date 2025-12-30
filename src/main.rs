@@ -11,6 +11,10 @@ struct Cli {
     #[arg(value_name = "DESCRIPTION")]
     description: Option<String>,
 
+    /// Enable verbose output (shows endpoint, model, etc.)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
     #[command(subcommand)]
     command: Option<CliCommand>,
 }
@@ -49,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle main command suggestion flow
     if let Some(description) = cli.description {
-        handle_suggest(&description).await?;
+        handle_suggest(&description, cli.verbose).await?;
     } else {
         println!("Usage: shai \"<command description>\"");
         println!("       shai history [OPTIONS]");
@@ -59,8 +63,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handle_suggest(user_input: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_suggest(user_input: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
+    
+    // Output verbose information if requested
+    if verbose {
+        println!("=== Verbose Mode ===");
+        println!("Endpoint: {}", config.endpoint);
+        println!("Model: {}", config.model);
+        println!("Suggestion count: {}", config.suggestion_count);
+        println!("User input: {}", user_input);
+        println!("===================\n");
+    }
     
     // Initialize OpenAI client
     let client = OpenAIClient::builder()
@@ -72,10 +86,18 @@ async fn handle_suggest(user_input: &str) -> Result<(), Box<dyn std::error::Erro
 
     let mut suggestions: Vec<Suggestion> = Vec::new();
     
-    for _ in 0..config.suggestion_count {
+    for i in 0..config.suggestion_count {
+        if verbose {
+            println!("Requesting suggestion {} of {}...", i + 1, config.suggestion_count);
+        }
+        
         let mut retry_count = 3;
         while retry_count > 0 {
             let result = get_command_suggestion(&client, &config.model, user_input).await?;
+            
+            if verbose {
+                println!("Raw AI response: {}", result);
+            }
             
             let result = result.trim().trim_matches(&['`', '\n', '\r']).to_string();
             let command = result.replace("command: ", "").trim_start().to_string();
@@ -83,9 +105,15 @@ async fn handle_suggest(user_input: &str) -> Result<(), Box<dyn std::error::Erro
             if command.is_empty() {
                 println!("Invalid command: {}", command);
                 retry_count -= 1;
+                if verbose {
+                    println!("Retrying... ({} attempts left)", retry_count);
+                }
             } else {
                 let suggestion = Suggestion::new(command);
                 suggestions.push(suggestion);
+                if verbose {
+                    println!("✓ Suggestion generated successfully\n");
+                }
                 retry_count = 0;
             }
         }
@@ -108,10 +136,21 @@ async fn handle_suggest(user_input: &str) -> Result<(), Box<dyn std::error::Erro
     
     let final_suggestion = Suggestion::new(command.clone());
     
+    if verbose {
+        println!("\n=== Execution Info ===");
+        println!("Command to execute: {}", final_suggestion.command);
+        println!("======================\n");
+    }
+    
     // Save to history before execution
     let history = History::new();
     let history_entry = Command::new(user_input.to_string(), command);
     history.add(history_entry)?;
+    
+    if verbose {
+        println!("✓ Command saved to history");
+        println!("Executing command...\n");
+    }
     
     // Execute the command
     final_suggestion.execute()?;
