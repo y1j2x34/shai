@@ -1,6 +1,3 @@
-// Future bookmark feature - template for implementation
-// This file is a template showing how to add new features to SHAI
-
 use std::path::PathBuf;
 use crate::storage::{Storage, get_data_dir};
 

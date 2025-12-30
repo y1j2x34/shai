@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use inquire::{Select, Text};
 use openai_api_rs::v1::api::OpenAIClient;
-use shai::{Config, History, Suggestion, Command, get_command_suggestion};
+use shai::{Config, History, Suggestion, Command, get_command_suggestion, Bookmark, BookmarkItem};
 
 #[derive(Parser)]
 #[command(name = "shai")]
@@ -35,6 +35,43 @@ enum CliCommand {
         #[arg(short, long)]
         clear: bool,
     },
+    /// Manage command bookmarks
+    Bookmark {
+        #[command(subcommand)]
+        action: BookmarkAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum BookmarkAction {
+    /// Add a new bookmark
+    Add {
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        command: String,
+        #[arg(short, long)]
+        description: Option<String>,
+        #[arg(short, long)]
+        tags: Vec<String>,
+    },
+    /// List all bookmarks
+    List {
+        #[arg(short, long)]
+        tag: Option<String>,
+    },
+    /// Get a specific bookmark
+    Get {
+        name: String,
+    },
+    /// Remove a bookmark
+    Remove {
+        name: String,
+    },
+    /// Search bookmarks
+    Search {
+        query: String,
+    },
 }
 
 
@@ -48,6 +85,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             CliCommand::History { limit, search, clear } => {
                 return handle_history(limit, search, clear);
             }
+            CliCommand::Bookmark { action } => {
+                return handle_bookmark(action);
+            }
         }
     }
 
@@ -57,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("Usage: shai \"<command description>\"");
         println!("       shai history [OPTIONS]");
+        println!("       shai bookmark [SUBCOMMAND]");
         println!("\nRun 'shai --help' for more information.");
     }
 
@@ -199,6 +240,106 @@ fn handle_history(limit: usize, search: Option<String>, clear: bool) -> Result<(
         };
         
         println!("{:<20} {:<40} {}", datetime, desc, command_display);
+    }
+    
+    Ok(())
+}
+
+fn handle_bookmark(action: BookmarkAction) -> Result<(), Box<dyn std::error::Error>> {
+    let bookmark = Bookmark::new();
+    
+    match action {
+        BookmarkAction::Add { name, command, description, tags } => {
+            let item = BookmarkItem {
+                name: name.clone(),
+                command,
+                description: description.unwrap_or_default(),
+                tags,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            bookmark.add(item)?;
+            println!("Bookmark '{}' added successfully!", name);
+        }
+        BookmarkAction::List { tag } => {
+            let items = bookmark.list(tag)?;
+            if items.is_empty() {
+                println!("No bookmarks found.");
+                return Ok(());
+            }
+            
+            println!("\n{:<20} {:<40} {}", "Name", "Command", "Tags");
+            println!("{}", "-".repeat(100));
+            
+            for item in items {
+                let name_display = if item.name.len() > 17 {
+                    format!("{}...", &item.name[..17])
+                } else {
+                    item.name.clone()
+                };
+                
+                let command_display = if item.command.len() > 37 {
+                    format!("{}...", &item.command[..37])
+                } else {
+                    item.command.clone()
+                };
+                
+                let tags_display = item.tags.join(", ");
+                let tags_display = if tags_display.len() > 37 {
+                    format!("{}...", &tags_display[..37])
+                } else {
+                    tags_display
+                };
+                
+                println!("{:<20} {:<40} {}", name_display, command_display, tags_display);
+            }
+        }
+        BookmarkAction::Get { name } => {
+            if let Some(item) = bookmark.get(&name)? {
+                println!("\nBookmark: {}", item.name);
+                println!("Command: {}", item.command);
+                println!("Description: {}", item.description);
+                println!("Tags: {}", item.tags.join(", "));
+                
+                let datetime = chrono::DateTime::from_timestamp(item.created_at, 0)
+                    .unwrap_or_default()
+                    .format("%Y-%m-%d %H:%M:%S");
+                println!("Created: {}", datetime);
+            } else {
+                println!("Bookmark '{}' not found", name);
+            }
+        }
+        BookmarkAction::Remove { name } => {
+            bookmark.remove(&name)?;
+            println!("Bookmark '{}' removed", name);
+        }
+        BookmarkAction::Search { query } => {
+            let items = bookmark.search(&query)?;
+            if items.is_empty() {
+                println!("No bookmarks found matching '{}'", query);
+                return Ok(());
+            }
+            
+            println!("\n{:<20} {:<40} {}", "Name", "Command", "Tags");
+            println!("{}", "-".repeat(100));
+            
+            for item in items {
+                let name_display = if item.name.len() > 17 {
+                    format!("{}...", &item.name[..17])
+                } else {
+                    item.name.clone()
+                };
+                
+                let command_display = if item.command.len() > 37 {
+                    format!("{}...", &item.command[..37])
+                } else {
+                    item.command.clone()
+                };
+                
+                let tags_display = item.tags.join(", ");
+                
+                println!("{:<20} {:<40} {}", name_display, command_display, tags_display);
+            }
+        }
     }
     
     Ok(())
