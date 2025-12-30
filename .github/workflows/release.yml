@@ -87,7 +87,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y musl-tools libssl-dev
         # Install cross-compiler for ARM
-        sudo apt-get install -y gcc-arm-linux-gnueabihf arm-linux-musleabihf-gcc
+        sudo apt-get install -y gcc-arm-linux-gnueabihf
         # Install dependencies for OpenSSL compilation
         sudo apt-get install -y make perl
 
