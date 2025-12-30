@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use inquire::{Select, Text};
 use openai_api_rs::v1::api::OpenAIClient;
-use shai::{Config, History, Suggestion, Command, get_command_suggestion, Bookmark, BookmarkItem};
+use shai::{Config, History, Suggestion, Command, get_command_suggestion, Bookmark, BookmarkItem, generate_bookmark_info};
 
 #[derive(Parser)]
 #[command(name = "shai")]
@@ -72,6 +72,8 @@ enum BookmarkAction {
     Search {
         query: String,
     },
+    /// Smart save: Save last command as bookmark with AI-generated metadata
+    Save,
 }
 
 
@@ -86,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return handle_history(limit, search, clear);
             }
             CliCommand::Bookmark { action } => {
-                return handle_bookmark(action);
+                return handle_bookmark(action, cli.verbose).await;
             }
         }
     }
@@ -245,7 +247,7 @@ fn handle_history(limit: usize, search: Option<String>, clear: bool) -> Result<(
     Ok(())
 }
 
-fn handle_bookmark(action: BookmarkAction) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_bookmark(action: BookmarkAction, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let bookmark = Bookmark::new();
     
     match action {
@@ -339,6 +341,64 @@ fn handle_bookmark(action: BookmarkAction) -> Result<(), Box<dyn std::error::Err
                 
                 println!("{:<20} {:<40} {}", name_display, command_display, tags_display);
             }
+        }
+        BookmarkAction::Save => {
+            // Get last command from history
+            let history = History::new();
+            let commands = history.list(Some(1))?;
+            
+            if commands.is_empty() {
+                println!("No command history found. Run a command first.");
+                return Ok(());
+            }
+            
+            let last_command = &commands[0];
+            
+            if verbose {
+                println!("=== Verbose Mode ===");
+                println!("Command to bookmark: {}", last_command.command);
+                println!("Generating bookmark metadata with AI...");
+                println!("===================\n");
+            } else {
+                println!("Generating bookmark metadata for: {}", last_command.command);
+            }
+            
+            // Load config and initialize AI client
+            let config = Config::from_env()?;
+            let client = OpenAIClient::builder()
+                .with_header("HTTP-Referer", "http://github.com/y1j2x34/shai")
+                .with_header("X-Title", "SHAI")
+                .with_endpoint(&config.endpoint)
+                .with_api_key(&config.api_key)
+                .build()?;
+            
+            // Generate bookmark metadata with AI
+            let metadata = generate_bookmark_info(&client, &config.model, &last_command.command).await?;
+            
+            if verbose {
+                println!("AI generated metadata:");
+                println!("  Name: {}", metadata.name);
+                println!("  Description: {}", metadata.description);
+                println!("  Tags: {:?}\n", metadata.tags);
+            }
+            
+            // Check if bookmark already exists
+            if let Some(_existing) = bookmark.get(&metadata.name)? {
+                println!("⚠ Bookmark '{}' already exists. Please use 'bookmark remove' first or choose a different name.", metadata.name);
+                return Ok(());
+            }
+            
+            // Create and save the bookmark
+            let item = BookmarkItem {
+                name: metadata.name.clone(),
+                command: last_command.command.clone(),
+                description: metadata.description,
+                tags: metadata.tags,
+                created_at: chrono::Utc::now().timestamp(),
+            };
+            
+            bookmark.add(item)?;
+            println!("✓ Bookmark '{}' saved successfully!", metadata.name);
         }
     }
     

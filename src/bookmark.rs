@@ -201,6 +201,7 @@ To integrate this feature into main.rs, add:
 
 Usage examples:
   shai bookmark add --name "docker-clean" --command "docker system prune -af" --tags docker cleanup
+  shai bookmark save
   shai bookmark list
   shai bookmark list --tag docker
   shai bookmark get docker-clean
