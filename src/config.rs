@@ -1,5 +1,5 @@
 use std::env;
-use dotenv::dotenv;
+use dotenv::from_path;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -11,7 +11,14 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
-        dotenv().ok();
+        // First load .env from home directory (global config)
+        if let Some(home) = env::var_os("HOME") {
+            let env_path = std::path::PathBuf::from(home).join(".env");
+            from_path(&env_path).ok();
+        }
+        
+        // Then load .env from current directory (can override global config)
+        from_path(".env").ok();
         
         let api_key = env::var("SHAI_API_KEY")
             .expect("SHAI_API_KEY must be set");
