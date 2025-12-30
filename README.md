@@ -9,6 +9,8 @@ SHAI is a command-line tool that uses AI to suggest and execute shell commands b
 - Interactive command selection and modification
 - **Command history tracking** - automatically saves all executed commands
 - **History search** - quickly find previously used commands
+- **Command bookmarks** - save frequently used commands with metadata
+- **Smart bookmark save** - AI-powered automatic description and tagging
 - Support for custom OpenAI API endpoints
 - Cross-platform support (Linux, macOS, and Windows)
 - Modular architecture for easy feature extensions
@@ -82,6 +84,14 @@ SHAI_SUGGESTION_COUNT=2
 
 ## Usage
 
+### Global Options
+
+All commands support the following global option:
+
+```bash
+-v, --verbose    Enable verbose output (shows API endpoint, model, and other debug information)
+```
+
 ### Generate and Execute Commands
 
 ```bash
@@ -89,16 +99,19 @@ shai "your command description here"
 ```
 
 The tool will:
+
 1. Generate multiple command suggestions based on your description
 2. Display them in an interactive selection menu
 3. Allow you to modify the selected command before execution
 4. Save the command to history
 5. Execute the chosen command
 
-### View Command History
+### Command History
+
+View and manage your command execution history:
 
 ```bash
-# Show last 20 commands (default)
+# Show last 2 commands (default)
 shai history
 
 # Show last 10 commands
@@ -109,6 +122,33 @@ shai history --search "docker"
 
 # Clear all history
 shai history --clear
+```
+
+### Command Bookmarks
+
+Save and manage frequently used commands with bookmarks:
+
+```bash
+# Add a new bookmark manually
+shai bookmark add --name "update-system" --command "sudo apt update && sudo apt upgrade -y" --description "Update system packages" --tags "system,maintenance"
+
+# Smart save: Save last executed command with AI-generated description and tags
+shai bookmark save
+
+# List all bookmarks
+shai bookmark list
+
+# List bookmarks by tag
+shai bookmark list --tag system
+
+# Get a specific bookmark
+shai bookmark get update-system
+
+# Search bookmarks
+shai bookmark search "docker"
+
+# Remove a bookmark
+shai bookmark remove update-system
 ```
 
 ### Examples
@@ -141,6 +181,25 @@ shai history --clear
 
     ```bash
     shai history --search docker
+    ```
+
+6. **Save a useful command as bookmark:**
+
+    ```bash
+    # After executing a command you want to remember
+    shai bookmark save
+    ```
+
+7. **List all system maintenance bookmarks:**
+
+    ```bash
+    shai bookmark list --tag maintenance
+    ```
+
+8. **Find bookmarks about Docker:**
+
+    ```bash
+    shai bookmark search docker
     ```
 
 ## License
