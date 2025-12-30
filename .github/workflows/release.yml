@@ -81,51 +81,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install gcc-aarch64-linux-gnu libc6-dev-i386
 
-    - name: Install ARM Toolchain and OpenSSL
+    - name: Install cross for ARM targets
       if: ${{ matrix.target == 'arm-unknown-linux-musleabihf' || matrix.target == 'armv7-unknown-linux-musleabihf' }}
       run: |
-        sudo apt-get update
-        sudo apt-get install -y musl-tools libssl-dev
-        # Install cross-compiler for ARM
-        sudo apt-get install -y gcc-arm-linux-gnueabihf
-        # Install dependencies for OpenSSL compilation
-        sudo apt-get install -y make perl
-
-        # Download and build musl-cross-make
-        git clone https://github.com/richfelker/musl-cross-make.git
-        cd musl-cross-make
-        echo "TARGET = armv7l-linux-musleabihf" > config.mak
-        echo "OUTPUT = /usr/local/musl" >> config.mak
-        make -j$(nproc)
-        sudo make install
-        cd ..
-
-        # Download and cross-compile OpenSSL
-        wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
-        tar xf openssl-1.1.1w.tar.gz
-        cd openssl-1.1.1w
-        
-        # Configure OpenSSL for ARM with musl
-        export CC=/usr/local/musl/bin/armv7l-linux-musleabihf-gcc
-        export AR=/usr/local/musl/bin/armv7l-linux-musleabihf-ar
-        export RANLIB=/usr/local/musl/bin/armv7l-linux-musleabihf-ranlib
-        
-        ./Configure linux-generic32 no-shared \
-          --prefix=/usr/local/musl/armv7l-linux-musleabihf \
-          --openssldir=/usr/local/musl/armv7l-linux-musleabihf/openssl \
-          -static
-        
-        make -j$(nproc)
-        sudo make install_sw
-        cd ..
-
-        # Set environment variables for cross-compilation
-        echo "OPENSSL_DIR=/usr/local/musl/armv7l-linux-musleabihf" >> $GITHUB_ENV
-        echo "OPENSSL_STATIC=1" >> $GITHUB_ENV
-        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-        echo "PKG_CONFIG_PATH=/usr/local/musl/armv7l-linux-musleabihf/lib/pkgconfig" >> $GITHUB_ENV
-        echo "OPENSSL_INCLUDE_DIR=/usr/local/musl/armv7l-linux-musleabihf/include" >> $GITHUB_ENV
-        echo "OPENSSL_LIB_DIR=/usr/local/musl/armv7l-linux-musleabihf/lib" >> $GITHUB_ENV
+        cargo install cross --git https://github.com/cross-rs/cross
+        echo "USE_CROSS=true" >> $GITHUB_ENV
 
     - name: Install AArch64 Toolchain (Windows)
       if: ${{ matrix.target == 'aarch64-pc-windows-msvc' }}

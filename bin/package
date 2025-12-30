@@ -17,8 +17,15 @@ if [[ $TARGET == aarch64-unknown-linux-musl ]]; then
 fi
 
 echo "Building shai..."
-RUSTFLAGS="--deny warnings --codegen target-feature=+crt-static $TARGET_RUSTFLAGS" \
-  cargo build --bin shai --target $TARGET --release
+# Use cross for ARM musl targets, cargo for others
+if [[ "${USE_CROSS:-false}" == "true" ]]; then
+  echo "Using cross for cross-compilation..."
+  RUSTFLAGS="--deny warnings --codegen target-feature=+crt-static $TARGET_RUSTFLAGS" \
+    cross build --bin shai --target $TARGET --release
+else
+  RUSTFLAGS="--deny warnings --codegen target-feature=+crt-static $TARGET_RUSTFLAGS" \
+    cargo build --bin shai --target $TARGET --release
+fi
 EXECUTABLE=target/$TARGET/release/shai
 
 if [[ $OS == windows-latest ]]; then
